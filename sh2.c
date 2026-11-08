@@ -81,6 +81,14 @@
 
 #define ADVERT_TIMEOUT_US (200000)
 
+// Upper bound on any operation that does not set its own timeout (most of them leave
+// timeout_us at 0, which used to mean "wait forever"). Without a bound, a sensor hub
+// that stops answering mid-operation keeps opProcess() spinning in shtp_service() and
+// the host never regains control. Override at build time if a longer bound is needed.
+#ifndef SH2_OP_DEFAULT_TIMEOUT_US
+#define SH2_OP_DEFAULT_TIMEOUT_US (500000)
+#endif
+
 // Command and Subcommand values
 #define SH2_CMD_ERRORS                 1
 #define SH2_CMD_COUNTS                 2
@@ -639,10 +647,10 @@ static int opProcess(sh2_t *pSh2, const sh2_Op_t *pOp)
     }
 
     uint32_t now_us = start_us;
+    uint32_t const timeout_us = pOp->timeout_us ? pOp->timeout_us : SH2_OP_DEFAULT_TIMEOUT_US;
     // While op not complete and not timed out.
     while ((pSh2->pOp != 0) &&
-           ((pOp->timeout_us == 0) ||
-            ((now_us-start_us) < pOp->timeout_us))) {
+           ((now_us-start_us) < timeout_us)) {
 
         if (pSh2->pShtp == 0) {
             // Was SH2 interface closed unexpectedly?
